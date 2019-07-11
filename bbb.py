@@ -45,6 +45,12 @@ class Camera:
 		self.x = target.rect.centerx - self.screen_width / 2
 		self.y = target.rect.centery - self.screen_height / 2
 
+		# Move camera left/top half a tile if the map width/height has an even number of tiles - avoid cutting tiles in half
+		if not(self.screen_width / Game.TILESIZE % 2):
+			self.x += Game.TILESIZE / 2
+		if not(self.screen_height / Game.TILESIZE % 2):
+			self.y += Game.TILESIZE / 2
+
 		# Stop updating if target is too close to left/top edges - don't see black bits outside of map
 		self.x = max(self.x, 0)
 		self.y = max(self.y, 0)
@@ -59,7 +65,9 @@ class Camera:
 		if self.map_height <= self.screen_height:
 			self.y = -(self.screen_height - self.map_height) / 2
 
-		# Avoid seeing half a tile - push camera half a tile if close to the edge
+		
+
+		"""
 		if self.x == self.game.TILESIZE / 2:
 			self.x = 0
 		if self.y == self.game.TILESIZE / 2:
@@ -68,6 +76,7 @@ class Camera:
 			self.x = self.map_width - self.screen_width
 		if self.y == self.map_height - self.screen_height - self.game.TILESIZE / 2:
 			self.y = self.map_height - self.screen_height
+		"""
 
 		
 
@@ -76,6 +85,7 @@ class Camera:
 class Player(pygame.sprite.Sprite):
 	IMG = 'player.jpg'
 	MOVEMENT_COOLDOWN = 0.1
+	SPEED = 0.3
 
 	def __init__(self, game):
 		self.game = game
@@ -88,30 +98,35 @@ class Player(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
 
 		self.last_movement = 0
+		self.dir = [0, 0]
+		self.target_tile = None
+		self.target_x = None
+		self.target_y = None
 
-	def get_movement(self):
-		command = [0, 0]
+	def get_dir(self):
+		# Don't accept input if player is already moving
+		if self.dir != [0, 0]:
+			return
+
 		keys = pygame.key.get_pressed()
 		if keys[pygame.K_w] or keys[pygame.K_UP]:
-			command = [0, -1]
+			self.dir = [0, -1]
 		elif keys[pygame.K_a] or keys[pygame.K_LEFT]:
-			command = [-1, 0]
+			self.dir = [-1, 0]
 		elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-			command = [0, 1]
+			self.dir = [0, 1]
 		elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-			command = [1, 0]
+			self.dir = [1, 0]
 
-		return command
-
-	def is_curr_tile_legal(self):
+	def is_tile_legal(self, tile):
 		# Check edges
-		if self.curr_tile[0] < 0 or self.curr_tile[1] < 0:
+		if tile[0] < 0 or tile[1] < 0:
 			return False
-		if self.curr_tile[0] > self.game.map.get_horiz_tiles() - 1 or self.curr_tile[1] > self.game.map.get_vert_tiles() - 1:
+		if tile[0] > self.game.map.get_horiz_tiles() - 1 or tile[1] > self.game.map.get_vert_tiles() - 1:
 			return False
 
 		# Custom rules
-		metadata = self.game.map.get_tile_metadata(self.curr_tile)
+		metadata = self.game.map.get_tile_metadata(tile)
 		if not metadata:
 			return True
 		if 'FIRE' in metadata:
@@ -120,31 +135,56 @@ class Player(pygame.sprite.Sprite):
 		# Base case
 		return True
 
+	def move(self):
+		if self.dir != [0, 0] and time.time() - self.last_movement >= Player.MOVEMENT_COOLDOWN and not self.target_tile:
+			self.target_tile = [0, 0]
+			self.target_tile[0] = self.curr_tile[0] + self.dir[0]
+			self.target_tile[1] = self.curr_tile[1] + self.dir[1]
 
-
-	def move(self, command):
-		if command != [0, 0] and time.time() - self.last_movement >= Player.MOVEMENT_COOLDOWN:
-			self.rect.x += command[0] * Game.TILESIZE
-			self.curr_tile[0] += command[0]
-
-			self.rect.y += command[1] * Game.TILESIZE
-			self.curr_tile[1] += command[1]
-
-			if self.is_curr_tile_legal():
-				self.last_movement = time.time()
+			if not self.is_tile_legal(self.target_tile):
+				self.target_tile = None
+				self.dir = [0, 0]
 			else:
-				self.rect.x -= command[0] * Game.TILESIZE
-				self.curr_tile[0] -= command[0]
+				self.last_movement = time.time()
+				self.target_x = self.rect.x + self.dir[0] * Game.TILESIZE
+				self.target_y = self.rect.y + self.dir[1] * Game.TILESIZE	
 
-				self.rect.y -= command[1] * Game.TILESIZE
-				self.curr_tile[1] -= command[1]
+		if self.target_tile:
+			# Calculate base dx and dy tied to FPS
+			dx = self.dir[0] * Player.SPEED * self.game.dt
+			dy = self.dir[1] * Player.SPEED * self.game.dt
+
+			# Make sure dx and dy are at least 1 if the player is moving - it can round down to 0 keeping it still if not
+			if self.dir[0] and abs(dx) < 1:
+				dx = self.dir[0]
+			if self.dir[1] and abs(dy) < 1:
+				dy = self.dir[1]
+
+			# Move player, making sure not to move them past the target tile
+			if dx > 0:
+				self.rect.x = min(self.rect.x + dx, self.target_x)
+			if dy > 0:
+				self.rect.y = min(self.rect.y + dy, self.target_y)
+			if dx < 0:
+				self.rect.x = max(self.rect.x + dx, self.target_x)
+			if dy < 0:
+				self.rect.y = max(self.rect.y + dy, self.target_y)
+
+			if self.rect.x == self.target_x and self.rect.y == self.target_y:
+				self.curr_tile = self.target_tile
+				self.dir = [0, 0]
+				self.target_tile = None
+				self.target_x = None
+				self.target_y = None
+
+
 
 
 			
 
 	def update(self):
-		command = self.get_movement()
-		self.move(command)
+		self.get_dir()
+		self.move()
 
 	def draw(self):
 		pass
@@ -190,20 +230,21 @@ class Map:
 class Game:
 	# N.B. the number of tiles per side has to be odd to display the player in the middle of the screen!
 	TILESIZE = 32
-	SCREENWIDTH = TILESIZE * 21
-	SCREENHEIGHT = TILESIZE * 22
+	SCREENWIDTH = TILESIZE * 10
+	SCREENHEIGHT = TILESIZE * 11
 
 	def __init__(self):
 		pygame.init()
 
-		# self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
-		self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+		self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
+		# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
 		self.allplayers = pygame.sprite.Group()
 		self.allsprites = pygame.sprite.Group()
 
 		self.util = Utils()
 		self.clock = pygame.time.Clock()
+		self.dt = 0
 
 		self.map = None
 
@@ -248,7 +289,7 @@ class Game:
 
 			self.update()
 			self.draw()
-			self.clock.tick(45)
+			self.dt = self.clock.tick(45)
 
 if __name__ == '__main__':
 	Game().play()
