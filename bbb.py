@@ -118,6 +118,17 @@ class Player(pygame.sprite.Sprite):
 		elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
 			self.dir = [1, 0]
 
+		if self.game.joysticks:
+			if self.game.joysticks[0].get_axis(0) > 0.5:
+				self.dir = [1, 0]
+			if self.game.joysticks[0].get_axis(0) < -0.5:
+				self.dir = [-1, 0]
+			if self.game.joysticks[0].get_axis(1) > 0.5:
+				self.dir = [0, 1]
+			if self.game.joysticks[0].get_axis(1) < -0.5:
+				self.dir = [0, -1]
+
+
 	def is_tile_legal(self, tile):
 		# Check edges
 		if tile[0] < 0 or tile[1] < 0:
@@ -129,7 +140,7 @@ class Player(pygame.sprite.Sprite):
 		metadata = self.game.map.get_tile_metadata(tile)
 		if not metadata:
 			return True
-		if 'FIRE' in metadata:
+		if any(elem in ('CASA', 'DEATH') for elem in metadata):
 			return False
 
 		# Base case
@@ -202,7 +213,7 @@ class Map:
 		self.load()
 
 	def load(self):
-		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'map.jpeg'))
+		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'map.png'))
 		self.rect = self.image.get_rect()
 		with open(os.path.join(os.path.dirname(__file__), 'metadata.p'), 'rb') as in_file:
 			self.metadata = pickle.load(in_file)
@@ -228,16 +239,27 @@ class Map:
 
 
 class Game:
-	# N.B. the number of tiles per side has to be odd to display the player in the middle of the screen!
 	TILESIZE = 32
-	SCREENWIDTH = TILESIZE * 10
-	SCREENHEIGHT = TILESIZE * 11
+	SCREENWIDTH = TILESIZE * 32
+	SCREENHEIGHT = TILESIZE * 24
 
 	def __init__(self):
 		pygame.init()
 
-		self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
-		# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+		# Playing on Mac - fullscreen
+		if (1280, 800) in pygame.display.list_modes():
+			self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+			# self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
+
+		# Playing on TV - 1024 x 768
+		if (1280, 960) in pygame.display.list_modes():
+			self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT), pygame.FULLSCREEN)
+
+		# self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT), pygame.FULLSCREEN)
+		# self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
+		# display_info = pygame.display.Info()
+		# self.screen = pygame.display.set_mode((display_info.current_w, display_info.current_h))
+		# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
 		self.allplayers = pygame.sprite.Group()
 		self.allsprites = pygame.sprite.Group()
@@ -248,9 +270,19 @@ class Game:
 
 		self.map = None
 
-		self.setup()
+		self.joysticks = []
 
-	def setup(self):
+		self.setup_joysticks()
+		self.setup_level()
+
+	def setup_joysticks(self):
+		pygame.joystick.init()
+
+		for i in range(0, pygame.joystick.get_count()):
+			self.joysticks.append(pygame.joystick.Joystick(i))
+			self.joysticks[i].init()
+
+	def setup_level(self):
 		self.player = Player(self)
 		self.map = Map()
 		self.camera = Camera(self)

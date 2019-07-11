@@ -1,14 +1,10 @@
 #!/Library/Frameworks/Python.framework/Versions/2.7/bin/python2.7
 # coding: utf-8
 
-def index_to_coord(indexes):
-		x = indexes[0] * 32
-		y = indexes[0] * 32
+l1 = [1, 3, 5, 7, 9, 11]
+l2 = [2, 4, 6, 7, 5, 8]
 
-		print(x, y)
-
-		return x, y
-
-
-
-index_to_coord([2, 2])
+if any(i in l1 for i in l2):
+	print('yes')
+else:
+	print('no')
