@@ -1,6 +1,22 @@
 #!/Library/Frameworks/Python.framework/Versions/2.7/bin/python2.7
 # coding: utf-8
 
+
+"""
+	
+	next:
+		vary water tile
+		do 2 missing water tiles
+		enlarge water/grass tiles to make it clear whether player can or can't walk there
+
+	todo:
+		links (e.g. enter a house, new path, etc.)
+		(tile animations?)
+		os agnostic image load path (hardcoded at the moment)
+
+
+"""
+
 import pygame
 import sys
 import os
@@ -11,6 +27,8 @@ import pickle
 
 
 class Utils:
+	RIGHT, LEFT, UP, DOWN = range(4)
+
 	def __init__(self):
 		pass
 
@@ -65,28 +83,31 @@ class Camera:
 		if self.map_height <= self.screen_height:
 			self.y = -(self.screen_height - self.map_height) / 2
 
-		
 
-		"""
-		if self.x == self.game.TILESIZE / 2:
-			self.x = 0
-		if self.y == self.game.TILESIZE / 2:
-			self.y = 0
-		if self.x == self.map_width - self.screen_width - self.game.TILESIZE / 2:
-			self.x = self.map_width - self.screen_width
-		if self.y == self.map_height - self.screen_height - self.game.TILESIZE / 2:
-			self.y = self.map_height - self.screen_height
-		"""
 
 		
 
 
 
 class Player(pygame.sprite.Sprite):
-	IMG = 'player.jpg'
-	MOVEMENT_COOLDOWN = 0.1
-	SPEED = 0.3
+	IMG =  {Utils.RIGHT:	[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_right_0.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_right_1.png'))],
 
+			Utils.LEFT: 	[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_left_0.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_left_1.png'))],
+
+			Utils.UP: 		[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_up_0.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_up_1.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_up_2.png'))],
+
+			Utils.DOWN: 	[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_0.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_1.png')),
+						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_2.png'))]}
+
+	MOVEMENT_COOLDOWN = 0.1
+	SPEED = 0.1
+	ANIMFRAME_COOLDOWN = 0.2
+	
 	def __init__(self, game):
 		self.game = game
 		self.util = Utils()
@@ -94,9 +115,12 @@ class Player(pygame.sprite.Sprite):
 		pygame.sprite.Sprite.__init__(self, self.groups)
 
 		self.curr_tile = [2, 2]
-		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), Player.IMG))
+		self.facing = self.util.DOWN
+		self.anim_frame = 0
+		self.image = Player.IMG[self.facing][self.anim_frame]
 		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
 
+		self.last_anim = 0
 		self.last_movement = 0
 		self.dir = [0, 0]
 		self.target_tile = None
@@ -127,6 +151,15 @@ class Player(pygame.sprite.Sprite):
 				self.dir = [0, 1]
 			if self.game.joysticks[0].get_axis(1) < -0.5:
 				self.dir = [0, -1]
+
+		if self.dir == [1, 0]:
+			self.facing = self.util.RIGHT
+		elif self.dir == [-1, 0]:
+			self.facing = self.util.LEFT
+		elif self.dir == [0, -1]:
+			self.facing = self.util.UP
+		elif self.dir == [0, 1]:
+			self.facing = self.util.DOWN
 
 
 	def is_tile_legal(self, tile):
@@ -183,19 +216,47 @@ class Player(pygame.sprite.Sprite):
 
 			if self.rect.x == self.target_x and self.rect.y == self.target_y:
 				self.curr_tile = self.target_tile
-				self.dir = [0, 0]
 				self.target_tile = None
 				self.target_x = None
 				self.target_y = None
 
+				# This helps keeping the walking animation smooth instead of restarting it every tile
+				old_dir = self.dir
+				self.dir = [0, 0]
+				self.get_dir()
+				if self.dir != old_dir:
+					self.anim_frame = 0
 
 
+
+	def update_sprite(self):
+		if self.dir == [0, 0]:
+			self.anim_frame = 0
+		elif self.dir == [0, 1]:
+			if time.time() - self.last_anim > Player.ANIMFRAME_COOLDOWN:
+				self.anim_frame = (self.anim_frame + 1) % len(Player.IMG[self.util.DOWN])
+				self.last_anim = time.time()
+		elif self.dir == [0, -1]:
+			if time.time() - self.last_anim > Player.ANIMFRAME_COOLDOWN:
+				self.anim_frame = (self.anim_frame + 1) % len(Player.IMG[self.util.UP])
+				self.last_anim = time.time()
+		elif self.dir == [1, 0]:
+			if time.time() - self.last_anim > Player.ANIMFRAME_COOLDOWN:
+				self.anim_frame = (self.anim_frame + 1) % len(Player.IMG[self.util.RIGHT])
+				self.last_anim = time.time()
+		elif self.dir == [-1, 0]:
+			if time.time() - self.last_anim > Player.ANIMFRAME_COOLDOWN:
+				self.anim_frame = (self.anim_frame + 1) % len(Player.IMG[self.util.LEFT])
+				self.last_anim = time.time()
+
+		self.image = Player.IMG[self.facing][self.anim_frame]
 
 			
 
 	def update(self):
 		self.get_dir()
 		self.move()
+		self.update_sprite()
 
 	def draw(self):
 		pass
@@ -213,9 +274,9 @@ class Map:
 		self.load()
 
 	def load(self):
-		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'map.png'))
+		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/maps/map.png'))
 		self.rect = self.image.get_rect()
-		with open(os.path.join(os.path.dirname(__file__), 'metadata.p'), 'rb') as in_file:
+		with open(os.path.join(os.path.dirname(__file__), 'assets/maps/metadata.p'), 'rb') as in_file:
 			self.metadata = pickle.load(in_file)
 
 		self.horiz_tiles = self.image.get_width() / Game.TILESIZE
