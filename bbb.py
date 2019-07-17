@@ -48,8 +48,6 @@ class Camera:
 		self.game = game
 		self.screen_width = game.screen.get_width()
 		self.screen_height = game.screen.get_height()
-		# self.map_width = game.map.get_width()
-		# self.map_height = game.map.get_height()
 		self.map_width = self.game.map_width
 		self.map_height = self.game.map_height
 		self.x = 0
@@ -320,12 +318,15 @@ class Game:
 
 		self.joysticks = []
 
+		self.base_tiles = dict()
 		self.map_width = 0
 		self.map_height = 0
 		self.horiz_tiles = 0
 		self.vert_tiles = 0
 		self.alltiles = pygame.sprite.Group()
-		self.base_tiles = dict()
+
+		self.tile_layers = []
+		
 
 		self.setup_joysticks()
 		self.setup_level()
@@ -341,18 +342,30 @@ class Game:
 
 
 	def build_map(self):
-		with open(os.path.join(os.path.dirname(__file__), 'assets/level_1/metadata.p'), 'rb') as in_file:
-			metadata = pickle.load(in_file)
+		i = 0
+		while True:
+			curr_layer = []
+			map_file = 'metadata_' + str(i) + '.p'
+			map_path = os.path.join('assets', 'level_1')
+			map_path = os.path.join(map_path, map_file)
+			
+			try:
+				with open(os.path.join(os.path.dirname(__file__), map_path), 'rb') as in_file:
+					metadata = pickle.load(in_file)
 
+					self.horiz_tiles = len(metadata[0])
+					self.vert_tiles = len(metadata)
+					self.map_width = self.horiz_tiles * Game.TILESIZE
+					self.map_height = self.vert_tiles * Game.TILESIZE
 
-			self.horiz_tiles = len(metadata[0])
-			self.vert_tiles = len(metadata)
-			self.map_width = self.horiz_tiles * Game.TILESIZE
-			self.map_height = self.vert_tiles * Game.TILESIZE
+					for y in range(len(metadata)):
+						for x in range(len(metadata[y])):
+							curr_layer.append(Tile(self, x, y, metadata[y][x]))
 
-			for y in range(len(metadata)):
-				for x in range(len(metadata[y])):
-					Tile(self, x, y, metadata[y][x])
+				self.tile_layers.append(curr_layer)
+				i += 1
+			except:
+				break
 
 
 	def setup_joysticks(self):
@@ -376,17 +389,23 @@ class Game:
 	def draw(self):
 		self.screen.fill((0, 0, 0))
 
-		for sprite in self.allsprites:
-			self.screen.blit(sprite.image, self.camera.apply(sprite))
-
-			# Don't draw off-screen sprites
-			# if rect.right < 0 or rect.bottom < 0 or rect.left > Game.SCREENWIDTH or rect.top > Game.SCREENHEIGHT:
-			#		continue
+		for layer in self.tile_layers:
+			for tile in layer:
+				self.screen.blit(tile.image, self.camera.apply(tile))	
 
 		for sprite in self.allplayers:
 			self.screen.blit(sprite.image, self.camera.apply(sprite))
 		
 		pygame.display.flip()
+
+		# for sprite in self.allsprites:
+		# 	self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+			# Don't draw off-screen sprites
+			# if rect.right < 0 or rect.bottom < 0 or rect.left > Game.SCREENWIDTH or rect.top > Game.SCREENHEIGHT:
+			#		continue
+
+		
 
 	def play(self):
 		while True:

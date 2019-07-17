@@ -21,5 +21,3 @@ water_grass_top_0.png WATER
 water_grass_topleft_0.png WATER
 water_grass_topright_0.png WATER
 water_mid_0.png DEATH
-
-test_tile.png TEST_TILE
