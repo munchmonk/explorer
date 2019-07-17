@@ -13,6 +13,7 @@
 		links (e.g. enter a house, new path, etc.)
 		(tile animations?)
 		os agnostic image load path (hardcoded at the moment)
+		sanitize input like for real
 
 
 """
@@ -270,6 +271,8 @@ class BaseTile:
 
 
 class Tile(pygame.sprite.Sprite):
+	ANIMFRAME_COOLDOWN = 1
+
 	def __init__(self, game, x, y, tile_name):
 		self.game = game
 		self.groups = game.allsprites, game.alltiles
@@ -280,10 +283,38 @@ class Tile(pygame.sprite.Sprite):
 		self.x = x
 		self.y = y
 		self.coord = self.util.index_to_coord((self.x, self.y))
-		self.data = self.game.base_tiles[tile_name].tile_data
+		self.tile_data = self.game.base_tiles[tile_name].tile_data
 
-		self.image = self.game.base_tiles[tile_name].image
+		self.images = list()
+		self.find_images()
+		self.img_index = 0
+		self.last_anim = 0
+		self.image = self.images[self.img_index]
 		self.rect = self.image.get_rect(topleft=(self.coord))
+
+
+
+	def find_images(self):
+		# Add the default one
+		self.images.append(self.game.base_tiles[self.tile_data[0]].image)
+
+		# Add any more tiles with the format TILE_NAME_ID ANIM_TILE_NAME ID
+		if self.tile_data[1][:4] == 'ANIM':
+			for base_tile in self.game.base_tiles.values():
+				# Don't add itself and don't add a tile more than once
+				if base_tile.tile_data[0] != self.tile_data[0] and base_tile.tile_data[1] == self.tile_data[1] and base_tile.image not in self.images:
+					self.images.insert(int(base_tile.tile_data[2]), base_tile.image)
+
+
+	def update(self):
+		if len(self.images) > 1:
+			if time.time() - self.last_anim > Tile.ANIMFRAME_COOLDOWN:
+				self.img_index = (self.img_index + 1) % len(self.images)
+				self.image = self.images[self.img_index]
+				self.last_anim = time.time()
+
+
+
 
 
 class Game:

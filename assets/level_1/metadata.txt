@@ -1,4 +1,4 @@
-casa_0.png CASA	 BOTTOM_LEFT BELLALIZIOOOO
+casa_0.png CASA	 BOTTOM_LEFT
 casa_1.png CASA MID_BOTTOM
 casa_2.png CASA BOTTOM_RIGHT
 casa_3.png CASA TOP_LEFT
@@ -12,12 +12,21 @@ grass_3.png GRASS
 grass_4.png GRASS
 grass_5.png GRASS
 
-water_grass_bottom_0.png WATER
-water_grass_bottomleft_0.png WATER
-water_grass_bottomright_0.png WATER
-water_grass_left_0.png WATER
-water_grass_right_0.png WATER
-water_grass_top_0.png WATER
-water_grass_topleft_0.png WATER
-water_grass_topright_0.png WATER
-water_mid_0.png DEATH
+water_grass_bottom_0.png 	ANIM_WATER_GRASS_BOTTOM 0 WATER
+water_grass_bottom_1.png 	ANIM_WATER_GRASS_BOTTOM 1 WATER
+water_grass_bottomleft_0.png 	ANIM_WATER_GRASS_BOTTOMLEFT 0 WATER
+water_grass_bottomleft_1.png 	ANIM_WATER_GRASS_BOTTOMLEFT 1 WATER
+water_grass_bottomright_0.png 	ANIM_WATER_GRASS_BOTTOMRIGHT 0 WATER
+water_grass_bottomright_1.png 	ANIM_WATER_GRASS_BOTTOMRIGHT 1 WATER
+water_grass_left_0.png 	ANIM_WATER_GRASS_LEFT 0 WATER
+water_grass_left_1.png 	ANIM_WATER_GRASS_LEFT 1 WATER
+water_grass_right_0.png 	ANIM_WATER_GRASS_RIGHT 0 WATER
+water_grass_right_1.png 	ANIM_WATER_GRASS_RIGHT 1 WATER
+water_grass_top_0.png 		ANIM_WATER_GRASS_TOP 0 WATER
+water_grass_top_1.png 		ANIM_WATER_GRASS_TOP 1 WATER
+water_grass_topleft_0.png 	ANIM_WATER_GRASS_TOPLEFT 0 WATER
+water_grass_topleft_1.png 	ANIM_WATER_GRASS_TOPLEFT 1 WATER
+water_grass_topright_0.png 	ANIM_WATER_GRASS_TOPRIGHT 0 WATER
+water_grass_topright_1.png 	ANIM_WATER_GRASS_TOPRIGHT 1 WATER
+water_mid_0.png 		ANIM_WATER_MID 0
+water_mid_1.png 		ANIM_WATER_MID 1
