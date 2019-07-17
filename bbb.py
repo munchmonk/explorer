@@ -38,10 +38,8 @@ class Utils:
 
 	def index_to_coord(self, indexes):
 		x = indexes[0] * Game.TILESIZE
-		y = indexes[0] * Game.TILESIZE
+		y = indexes[1] * Game.TILESIZE
 		return x, y
-
-
 
 
 class Camera:
@@ -50,8 +48,10 @@ class Camera:
 		self.game = game
 		self.screen_width = game.screen.get_width()
 		self.screen_height = game.screen.get_height()
-		self.map_width = game.map.get_width()
-		self.map_height = game.map.get_height()
+		# self.map_width = game.map.get_width()
+		# self.map_height = game.map.get_height()
+		self.map_width = self.game.map_width
+		self.map_height = self.game.map_height
 		self.x = 0
 		self.y = 0
 
@@ -82,11 +82,6 @@ class Camera:
 			self.x = -(self.screen_width - self.map_width) / 2
 		if self.map_height <= self.screen_height:
 			self.y = -(self.screen_height - self.map_height) / 2
-
-
-
-		
-
 
 
 class Player(pygame.sprite.Sprite):
@@ -161,15 +156,20 @@ class Player(pygame.sprite.Sprite):
 		elif self.dir == [0, 1]:
 			self.facing = self.util.DOWN
 
-
 	def is_tile_legal(self, tile):
 		# Check edges
 		if tile[0] < 0 or tile[1] < 0:
 			return False
-		if tile[0] > self.game.map.get_horiz_tiles() - 1 or tile[1] > self.game.map.get_vert_tiles() - 1:
+		# if tile[0] > self.game.map.get_horiz_tiles() - 1 or tile[1] > self.game.map.get_vert_tiles() - 1:
+		if tile[0] > self.game.horiz_tiles - 1 or tile[1] > self.game.vert_tiles - 1:
 			return False
 
 		# Custom rules
+
+
+		return True
+
+
 		metadata = self.game.map.get_tile_metadata(tile)
 		if not metadata:
 			return True
@@ -227,8 +227,6 @@ class Player(pygame.sprite.Sprite):
 				if self.dir != old_dir:
 					self.anim_frame = 0
 
-
-
 	def update_sprite(self):
 		if self.dir == [0, 0]:
 			self.anim_frame = 0
@@ -251,8 +249,6 @@ class Player(pygame.sprite.Sprite):
 
 		self.image = Player.IMG[self.facing][self.anim_frame]
 
-			
-
 	def update(self):
 		self.get_dir()
 		self.move()
@@ -262,41 +258,34 @@ class Player(pygame.sprite.Sprite):
 		pass
 
 
-class Map:
-	def __init__(self):
-		self.image = None
-		self.rect = None
-		self.metadata = None
 
-		self.horiz_tiles = None
-		self.vert_tiles = None
 
-		self.load()
+class BaseTile:
+	# Obviously level will have to be fed into __init__ in the future
+	PATH = os.path.join('assets', 'level_1')
 
-	def load(self):
-		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/maps/map.png'))
-		self.rect = self.image.get_rect()
-		with open(os.path.join(os.path.dirname(__file__), 'assets/maps/metadata.p'), 'rb') as in_file:
-			self.metadata = pickle.load(in_file)
+	def __init__(self, tile_data):
+		self.tile_data = tile_data
+		tile_path = os.path.join(BaseTile.PATH, self.tile_data[0])
+		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), tile_path)).convert_alpha()
+	
 
-		self.horiz_tiles = self.image.get_width() / Game.TILESIZE
-		self.vert_tiles = self.image.get_height() / Game.TILESIZE
 
-	def get_tile_metadata(self, indexes):
-		# Note: second index first as it's columns -> rows
-		return self.metadata[indexes[1]][indexes[0]]
+class Tile(pygame.sprite.Sprite):
+	def __init__(self, game, x, y, tile_name):
+		self.game = game
+		self.groups = game.allsprites, game.alltiles
+		pygame.sprite.Sprite.__init__(self, self.groups)
 
-	def get_horiz_tiles(self):
-		return self.horiz_tiles
+		self.util = Utils()
 
-	def get_vert_tiles(self):
-		return self.vert_tiles
+		self.x = x
+		self.y = y
+		self.coord = self.util.index_to_coord((self.x, self.y))
+		self.data = self.game.base_tiles[tile_name].tile_data
 
-	def get_width(self):
-		return self.image.get_width()
-
-	def get_height(self):
-		return self.image.get_height()
+		self.image = self.game.base_tiles[tile_name].image
+		self.rect = self.image.get_rect(topleft=(self.coord))
 
 
 class Game:
@@ -309,8 +298,8 @@ class Game:
 
 		# Playing on Mac - fullscreen
 		if (1280, 800) in pygame.display.list_modes():
-			self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-			# self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
+			# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+			self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
 
 		# Playing on TV - 1024 x 768
 		if (1280, 960) in pygame.display.list_modes():
@@ -329,12 +318,42 @@ class Game:
 		self.clock = pygame.time.Clock()
 		self.dt = 0
 
-		self.map = None
-
 		self.joysticks = []
+
+		self.map_width = 0
+		self.map_height = 0
+		self.horiz_tiles = 0
+		self.vert_tiles = 0
+		self.alltiles = pygame.sprite.Group()
+		self.base_tiles = dict()
 
 		self.setup_joysticks()
 		self.setup_level()
+
+	def load_tiles(self):
+		with open(os.path.join(os.path.dirname(__file__), 'assets/level_1/metadata.txt'), 'r') as in_file:
+			for line in in_file:
+				text = line.split()
+
+				if text:
+					self.base_tiles[text[0]] = BaseTile(text)
+
+
+
+	def build_map(self):
+		with open(os.path.join(os.path.dirname(__file__), 'assets/level_1/metadata.p'), 'rb') as in_file:
+			metadata = pickle.load(in_file)
+
+
+			self.horiz_tiles = len(metadata[0])
+			self.vert_tiles = len(metadata)
+			self.map_width = self.horiz_tiles * Game.TILESIZE
+			self.map_height = self.vert_tiles * Game.TILESIZE
+
+			for y in range(len(metadata)):
+				for x in range(len(metadata[y])):
+					Tile(self, x, y, metadata[y][x])
+
 
 	def setup_joysticks(self):
 		pygame.joystick.init()
@@ -344,9 +363,11 @@ class Game:
 			self.joysticks[i].init()
 
 	def setup_level(self):
+		self.load_tiles()
+		self.build_map()
 		self.player = Player(self)
-		self.map = Map()
 		self.camera = Camera(self)
+
 
 	def update(self):
 		self.allsprites.update()
@@ -354,20 +375,16 @@ class Game:
 
 	def draw(self):
 		self.screen.fill((0, 0, 0))
-		self.screen.blit(self.map.image, (self.camera.apply(self.map)))
-		# self.screen.blit(self.map.image, (0, 0))
-
 
 		for sprite in self.allsprites:
-			# self.screen.blit(sprite.image, sprite.rect)
-			# rect = self.camera.apply_to_sprite(sprite)
 			self.screen.blit(sprite.image, self.camera.apply(sprite))
 
 			# Don't draw off-screen sprites
 			# if rect.right < 0 or rect.bottom < 0 or rect.left > Game.SCREENWIDTH or rect.top > Game.SCREENHEIGHT:
 			#		continue
 
-			
+		for sprite in self.allplayers:
+			self.screen.blit(sprite.image, self.camera.apply(sprite))
 		
 		pygame.display.flip()
 

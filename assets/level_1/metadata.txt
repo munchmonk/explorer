@@ -1,0 +1,25 @@
+casa_0.png CASA	 BOTTOM_LEFT BELLALIZIOOOO
+casa_1.png CASA MID_BOTTOM
+casa_2.png CASA BOTTOM_RIGHT
+casa_3.png CASA TOP_LEFT
+casa_4.png CASA MID_TOP
+casa_5.png CASA TOP_RIGHT
+
+grass_0.png GRASS
+grass_1.png GRASS
+grass_2.png GRASS
+grass_3.png GRASS
+grass_4.png GRASS
+grass_5.png GRASS
+
+water_grass_bottom_0.png WATER
+water_grass_bottomleft_0.png WATER
+water_grass_bottomright_0.png WATER
+water_grass_left_0.png WATER
+water_grass_right_0.png WATER
+water_grass_top_0.png WATER
+water_grass_topleft_0.png WATER
+water_grass_topright_0.png WATER
+water_mid_0.png DEATH
+
+test_tile.png TEST_TILE
