@@ -23,6 +23,7 @@ import sys
 import os
 import time
 import pickle
+import copy
 
 
 
@@ -102,13 +103,13 @@ class Player(pygame.sprite.Sprite):
 	SPEED = 0.1
 	ANIMFRAME_COOLDOWN = 0.2
 	
-	def __init__(self, game):
+	def __init__(self, x, y, game):
 		self.game = game
 		self.util = Utils()
 		self.groups = game.allsprites, game.allplayers
 		pygame.sprite.Sprite.__init__(self, self.groups)
 
-		self.curr_tile = [2, 2]
+		self.curr_tile = [x, y]
 		self.facing = self.util.DOWN
 		self.anim_frame = 0
 		self.image = Player.IMG[self.facing][self.anim_frame]
@@ -164,19 +165,22 @@ class Player(pygame.sprite.Sprite):
 			return False
 
 		# Custom rules
+		tags = []
 
+		for t in self.game.find_tile_by_coord(tile):
+			if t.tile_data:
+				for tag in t.tile_data:
+					tags.append(tag)
 
-		return True
-
-
-		metadata = self.game.map.get_tile_metadata(tile)
-		if not metadata:
-			return True
-		if any(elem in ('CASA', 'DEATH') for elem in metadata):
+		if 'WATER' in tags:
 			return False
 
-		# Base case
+		if 'CASA' in tags:
+			if any(tag in ('BOTTOM_LEFT', 'BOTTOM_RIGHT', 'TOP_LEFT', 'MID_TOP', 'TOP_RIGHT') for tag in tags):
+				return False
+
 		return True
+
 
 	def move(self):
 		if self.dir != [0, 0] and time.time() - self.last_movement >= Player.MOVEMENT_COOLDOWN and not self.target_tile:
@@ -225,6 +229,21 @@ class Player(pygame.sprite.Sprite):
 				self.get_dir()
 				if self.dir != old_dir:
 					self.anim_frame = 0
+
+				for tile in self.game.find_tile_by_coord(self.curr_tile):
+					if tile.tile_data:
+						for tag in tile.tile_data:
+							if 'PORTAL' in tag:
+								# Portal tag format: NEWLEVELNAME_PORTAL_SPAWNX_SPAWNY
+
+								tag_string = tag.split('_')
+								spawn_x = int(tag_string[-2])
+								spawn_y = int(tag_string[-1])
+								new_level = '_'.join(tag_string[:-3])
+
+								self.game.curr_level = new_level
+								self.game.setup_level(spawn_x, spawn_y)
+
 
 	def update_sprite(self):
 		if self.dir == [0, 0]:
@@ -357,27 +376,58 @@ class Game:
 		self.alltiles = pygame.sprite.Group()
 
 		self.tile_layers = []
-		
 
+		self.curr_level = 'level_1'
+		
 		self.setup_joysticks()
-		self.setup_level()
+		self.setup_level(3, 4)
+
+	def find_tile_by_coord(self, coord):
+		# It has to return a list because there might be more than one tile in the same place due to different layers
+		tiles = []
+		for tile in self.alltiles:
+			if tile.x == coord[0] and tile.y == coord[1]:
+				tiles.append(tile)
+		return tiles
 
 	def load_tiles(self):
-		with open(os.path.join(os.path.dirname(__file__), 'assets/level_1/metadata.txt'), 'r') as in_file:
+		self.base_tiles = dict()
+		self.alltiles = pygame.sprite.Group()
+
+		metadata_path = os.path.join('assets', self.curr_level)
+		metadata_path = os.path.join(metadata_path, 'metadata.txt')
+		metadata_path = os.path.join(os.path.dirname(__file__), metadata_path)
+
+		with open(metadata_path, 'r') as in_file:
 			for line in in_file:
 				text = line.split()
 
 				if text:
 					self.base_tiles[text[0]] = BaseTile(text)
 
+	def build_portals(self):
+		if self.curr_level == 'level_1':
+			self.add_portal(4, 10, 'level_2_PORTAL_9_2')
 
+		if self.curr_level == 'level_2':
+			self.add_portal(9, 1, 'level_1_PORTAL_4_11')
+
+
+	def add_portal(self, x, y, portal_tag):
+		# N.B. use deep copies for tile tags
+		tile = [t for t in self.find_tile_by_coord((x, y)) if t.tile_data][0]
+		new_data = copy.deepcopy(tile.tile_data)
+		new_data.append(portal_tag)
+		tile.tile_data = new_data
 
 	def build_map(self):
+		self.tile_layers = []
+
 		i = 0
 		while True:
 			curr_layer = []
 			map_file = 'metadata_' + str(i) + '.p'
-			map_path = os.path.join('assets', 'level_1')
+			map_path = os.path.join('assets', self.curr_level)
 			map_path = os.path.join(map_path, map_file)
 			
 			try:
@@ -391,13 +441,20 @@ class Game:
 
 					for y in range(len(metadata)):
 						for x in range(len(metadata[y])):
+
+							# Overwrites existing tiles
+							existing_tiles = self.find_tile_by_coord((x, y))
+							if existing_tiles:
+								for existing_tile in existing_tiles:
+									existing_tile.tile_data = None
+
 							curr_layer.append(Tile(self, x, y, metadata[y][x]))
 
 				self.tile_layers.append(curr_layer)
 				i += 1
+
 			except:
 				break
-
 
 	def setup_joysticks(self):
 		pygame.joystick.init()
@@ -406,10 +463,12 @@ class Game:
 			self.joysticks.append(pygame.joystick.Joystick(i))
 			self.joysticks[i].init()
 
-	def setup_level(self):
+	def setup_level(self, spawn_x, spawn_y):
 		self.load_tiles()
 		self.build_map()
-		self.player = Player(self)
+		self.build_portals()
+		self.allplayers.empty()
+		self.player = Player(spawn_x, spawn_y, self)
 		self.camera = Camera(self)
 
 

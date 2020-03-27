@@ -13,7 +13,22 @@ d = d.replace(' ', '')
 # print(str.isdigit(d))
 
 
-a = [0, 1, 2]
-a.insert(10, 9)
-a.insert(3, 8)
-print(a)
+
+
+def func(a):
+	print(a[0], a[1])
+
+# func((13, 12))
+
+
+a = [1, 2, 3, 4, 5]
+b = [2, 7]
+
+
+a = 'level_2_3_3'
+a = 'ciao'
+b = 'mamma'
+c = 'bye'
+
+d = '_'.join([a, b, c])
+print(d)
