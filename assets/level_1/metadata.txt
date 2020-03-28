@@ -30,3 +30,34 @@ water_grass_topright_0.png 	ANIM_WATER_GRASS_TOPRIGHT 0 WATER
 water_grass_topright_1.png 	ANIM_WATER_GRASS_TOPRIGHT 1 WATER
 water_mid_0.png 		ANIM_WATER_MID 0 WATER
 water_mid_1.png 		ANIM_WATER_MID 1 WATER
+
+tree_top_0.png ANIM_TREE_TOP 0 TREE TOP TOP_LAYER
+tree_top_1.png ANIM_TREE_TOP 1 TREE TOP TOP_LAYER
+tree_top_2.png ANIM_TREE_TOP 2 TREE TOP TOP_LAYER
+tree_top_3.png ANIM_TREE_TOP 3 TREE TOP TOP_LAYER
+tree_bottom_0.png ANIM_TREE_BOTTOM 0 TREE BOTTOM
+tree_bottom_1.png ANIM_TREE_BOTTOM 1 TREE BOTTOM
+tree_bottom_2.png ANIM_TREE_BOTTOM 2 TREE BOTTOM
+tree_bottom_3.png ANIM_TREE_BOTTOM 3 TREE BOTTOM
+
+
+dirt_path_top.png DIRT_PATH 
+dirt_path_mid.png DIRT_PATH 
+dirt_path_bottom.png DIRT_PATH 
+dirt_path_right.png DIRT_PATH 
+dirt_path_left.png DIRT_PATH 
+dirt_path_topright.png DIRT_PATH 
+dirt_path_topleft.png DIRT_PATH 
+dirt_path_bottomright.png DIRT_PATH 
+dirt_path_bottomleft.png DIRT_PATH 
+dirt_path_single_vertical.png DIRT_PATH
+dirt_path_single_verticaltop.png DIRT_PATH
+dirt_path_single_verticalbottom.png DIRT_PATH
+dirt_path_curve_bottomright.png DIRT_PATH
+dirt_path_curve_bottomleft.png DIRT_PATH
+dirt_path_curve_topright.png DIRT_PATH
+dirt_path_curve_topleft.png DIRT_PATH
+dirt_path_threeway_top.png DIRT_PATH
+dirt_path_threeway_bottom.png DIRT_PATH
+dirt_path_threeway_right.png DIRT_PATH
+dirt_path_threeway_left.png DIRT_PATH

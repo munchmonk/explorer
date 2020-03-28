@@ -32,3 +32,8 @@ c = 'bye'
 
 d = '_'.join([a, b, c])
 print(d)
+
+0 = problema
+1 = problema
+2 = problema
+3 = problema

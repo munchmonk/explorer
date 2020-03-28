@@ -4,6 +4,8 @@
 
 """
 	
+	basetiles must be cleared and reloaded every time a new map is loaded!! currently they are loaded once and never again
+
 	next:
 		vary water tile
 		do 2 missing water tiles
@@ -109,7 +111,19 @@ class Player(pygame.sprite.Sprite):
 		self.groups = game.allsprites, game.allplayers
 		pygame.sprite.Sprite.__init__(self, self.groups)
 
-		self.reset(spawn_x, spawn_y)
+		# This below is a copy of reset() but I'd rather it be clear what attributes Player has instead of declaring them outside of init()
+		self.curr_tile = [spawn_x, spawn_y]
+		self.facing = self.util.DOWN
+		self.anim_frame = 0
+		self.image = Player.IMG[self.facing][self.anim_frame]
+		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
+
+		self.last_anim = 0
+		self.last_movement = 0
+		self.dir = [0, 0]
+		self.target_tile = None
+		self.target_x = None
+		self.target_y = None
 
 	def get_dir(self):
 		# Don't accept input if player is already moving
@@ -153,7 +167,7 @@ class Player(pygame.sprite.Sprite):
 		if tile[0] > self.game.horiz_tiles - 1 or tile[1] > self.game.vert_tiles - 1:
 			return False
 
-		# Custom rules
+		# Custom rules - to be processed by an external function and potentially level by level in the future
 		tags = []
 
 		for t in self.game.find_tile_by_coord(tile):
@@ -161,7 +175,11 @@ class Player(pygame.sprite.Sprite):
 				for tag in t.tile_data:
 					tags.append(tag)
 
-		if 'WATER' in tags:
+		# To be extended
+		if any(tag in ('WATER') for tag in tags):
+			return False
+
+		if 'TREE' in tags and 'BOTTOM' in tags:
 			return False
 
 		if 'CASA' in tags:
@@ -224,20 +242,21 @@ class Player(pygame.sprite.Sprite):
 					if tile.tile_data:
 						for tag in tile.tile_data:
 							if 'PORTAL' in tag:
-								# Portal tag format: NEWLEVELNAME_PORTAL_SPAWNX_SPAWNY
-
+								# Portal tag format: NEWLEVELNAME_PORTAL_SPAWNX_SPAWNY_FACING
 								tag_string = tag.split('_')
-								spawn_x = int(tag_string[-2])
-								spawn_y = int(tag_string[-1])
-								new_level = '_'.join(tag_string[:-3])
+
+								spawn_x = int(tag_string[-3])
+								spawn_y = int(tag_string[-2])
+								facing = int(tag_string[-1])
+								new_level = '_'.join(tag_string[:-4])
 
 								self.game.curr_level = new_level
-								self.game.setup_level(spawn_x, spawn_y)
+								self.game.setup_level(spawn_x, spawn_y, facing)
 
 
-	def reset(self, spawn_x, spawn_y):
+	def reset(self, spawn_x, spawn_y, facing):
 		self.curr_tile = [spawn_x, spawn_y]
-		self.facing = self.util.DOWN
+		self.facing = facing
 		self.anim_frame = 0
 		self.image = Player.IMG[self.facing][self.anim_frame]
 		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
@@ -285,11 +304,12 @@ class Player(pygame.sprite.Sprite):
 
 class BaseTile:
 	# Obviously level will have to be fed into __init__ in the future
-	PATH = os.path.join('assets', 'level_1')
+	# PATH = os.path.join('assets', 'level_1')
 
-	def __init__(self, tile_data):
+	def __init__(self, tile_data, level):
 		self.tile_data = tile_data
-		tile_path = os.path.join(BaseTile.PATH, self.tile_data[0])
+		level_path = os.path.join('assets', level)
+		tile_path = os.path.join(level_path, self.tile_data[0])
 		self.image = pygame.image.load(os.path.join(os.path.dirname(__file__), tile_path)).convert_alpha()
 	
 
@@ -308,6 +328,7 @@ class Tile(pygame.sprite.Sprite):
 		self.y = y
 		self.coord = self.util.index_to_coord((self.x, self.y))
 		self.tile_data = self.game.base_tiles[tile_name].tile_data
+		self.print_above_player = True if 'TOP_LAYER' in self.tile_data else False
 
 		self.images = list()
 		self.find_images()
@@ -343,8 +364,8 @@ class Tile(pygame.sprite.Sprite):
 
 class Game:
 	TILESIZE = 32
-	SCREENWIDTH = TILESIZE * 32
-	SCREENHEIGHT = TILESIZE * 24
+	SCREENWIDTH = TILESIZE * 11 # 32
+	SCREENHEIGHT = TILESIZE * 10 # 24
 
 	def __init__(self):
 		pygame.init()
@@ -352,7 +373,8 @@ class Game:
 		# Playing on Mac - fullscreen
 		if (1280, 800) in pygame.display.list_modes():
 			# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-			self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
+			# self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
+			self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
 
 		# Playing on TV - 1024 x 768
 		if (1280, 960) in pygame.display.list_modes():
@@ -387,7 +409,7 @@ class Game:
 		self.curr_level = 'level_1'
 		
 		self.setup_joysticks()
-		self.setup_level(1, 3)
+		self.setup_level(1, 1, self.util.DOWN)
 
 	def find_tile_by_coord(self, coord):
 		# It has to return a list because there might be more than one tile in the same place due to different layers
@@ -410,22 +432,27 @@ class Game:
 				text = line.split()
 
 				if text:
-					self.base_tiles[text[0]] = BaseTile(text)
+					self.base_tiles[text[0]] = BaseTile(text, self.curr_level)
 
 	def build_portals(self):
 		# To be fed via file in the future
 
 		if self.curr_level == 'level_1':
-			self.add_portal(4, 10, 'level_2_PORTAL_3_4')
-			self.add_portal(8, 12, 'level_2_PORTAL_9_8')
+			self.add_portal(4, 10, 'level_2_PORTAL_3_4', self.util.DOWN)
+			self.add_portal(8, 12, 'level_2_PORTAL_9_8', self.util.DOWN)
+			self.add_portal(1, 0, 'forest_PORTAL_1_18', self.util.UP)
 
 		if self.curr_level == 'level_2':
-			self.add_portal(3, 3, 'level_1_PORTAL_4_11')
-			self.add_portal(9, 7, 'level_1_PORTAL_8_13')
+			self.add_portal(3, 3, 'level_1_PORTAL_4_11', self.util.DOWN)
+			self.add_portal(9, 7, 'level_1_PORTAL_8_13', self.util.DOWN)
 
+		if self.curr_level == 'forest':
+			self.add_portal(1, 19, 'level_1_PORTAL_1_1', self.util.DOWN)
 
-	def add_portal(self, x, y, portal_tag):
+	def add_portal(self, x, y, portal_tag, facing):
 		# N.B. use deep copies for tile tags
+		portal_tag = portal_tag + '_' + str(facing)
+
 		tile = [t for t in self.find_tile_by_coord((x, y)) if t.tile_data][0]
 		new_data = copy.deepcopy(tile.tile_data)
 		new_data.append(portal_tag)
@@ -453,11 +480,14 @@ class Game:
 					for y in range(len(metadata)):
 						for x in range(len(metadata[y])):
 
-							# Overwrites existing tiles
-							existing_tiles = self.find_tile_by_coord((x, y))
-							if existing_tiles:
-								for existing_tile in existing_tiles:
-									existing_tile.tile_data = None
+							# Below code was creating a bug where two different tiles overlap; I'll leave it commented for now in case there is a valid reason
+							# I wanted to overwrite the tile. I can't think of any now
+
+							# # Overwrites existing tiles
+							# existing_tiles = self.find_tile_by_coord((x, y))
+							# if existing_tiles:
+							# 	for existing_tile in existing_tiles:
+							# 		# existing_tile.tile_data = None
 
 							curr_layer.append(Tile(self, x, y, metadata[y][x]))
 
@@ -474,11 +504,11 @@ class Game:
 			self.joysticks.append(pygame.joystick.Joystick(i))
 			self.joysticks[i].init()
 
-	def setup_level(self, spawn_x, spawn_y):
+	def setup_level(self, spawn_x, spawn_y, facing):
 		self.load_tiles()
 		self.build_map()
 		self.build_portals()
-		self.player.reset(spawn_x, spawn_y)
+		self.player.reset(spawn_x, spawn_y, facing)
 		self.camera = Camera(self)
 
 
@@ -499,12 +529,21 @@ class Game:
 	def draw(self):
 		self.screen.fill((0, 0, 0))
 
+		# Draw everything 'below' the player
 		for layer in self.tile_layers:
 			for tile in layer:
-				self.screen.blit(tile.image, self.camera.apply(tile))	
+				if not tile.print_above_player:
+					self.screen.blit(tile.image, self.camera.apply(tile))	
 
+		# Draw the player
 		for sprite in self.allplayers:
 			self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+		# Draw everything 'above' the player
+		for layer in self.tile_layers:
+			for tile in layer:
+				if tile.print_above_player:
+					self.screen.blit(tile.image, self.camera.apply(tile))	
 		
 		pygame.display.flip()
 
