@@ -103,24 +103,13 @@ class Player(pygame.sprite.Sprite):
 	SPEED = 0.1
 	ANIMFRAME_COOLDOWN = 0.2
 	
-	def __init__(self, x, y, game):
+	def __init__(self, game, spawn_x, spawn_y):
 		self.game = game
 		self.util = Utils()
 		self.groups = game.allsprites, game.allplayers
 		pygame.sprite.Sprite.__init__(self, self.groups)
 
-		self.curr_tile = [x, y]
-		self.facing = self.util.DOWN
-		self.anim_frame = 0
-		self.image = Player.IMG[self.facing][self.anim_frame]
-		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
-
-		self.last_anim = 0
-		self.last_movement = 0
-		self.dir = [0, 0]
-		self.target_tile = None
-		self.target_x = None
-		self.target_y = None
+		self.reset(spawn_x, spawn_y)
 
 	def get_dir(self):
 		# Don't accept input if player is already moving
@@ -230,6 +219,7 @@ class Player(pygame.sprite.Sprite):
 				if self.dir != old_dir:
 					self.anim_frame = 0
 
+				# Portals
 				for tile in self.game.find_tile_by_coord(self.curr_tile):
 					if tile.tile_data:
 						for tag in tile.tile_data:
@@ -243,6 +233,21 @@ class Player(pygame.sprite.Sprite):
 
 								self.game.curr_level = new_level
 								self.game.setup_level(spawn_x, spawn_y)
+
+
+	def reset(self, spawn_x, spawn_y):
+		self.curr_tile = [spawn_x, spawn_y]
+		self.facing = self.util.DOWN
+		self.anim_frame = 0
+		self.image = Player.IMG[self.facing][self.anim_frame]
+		self.rect = self.image.get_rect(topleft=(self.util.index_to_coord(self.curr_tile)))
+
+		self.last_anim = 0
+		self.last_movement = 0
+		self.dir = [0, 0]
+		self.target_tile = None
+		self.target_x = None
+		self.target_y = None
 
 
 	def update_sprite(self):
@@ -362,6 +367,8 @@ class Game:
 		self.allplayers = pygame.sprite.Group()
 		self.allsprites = pygame.sprite.Group()
 
+		self.player = Player(self, 0, 0)
+
 		self.util = Utils()
 		self.clock = pygame.time.Clock()
 		self.dt = 0
@@ -380,7 +387,7 @@ class Game:
 		self.curr_level = 'level_1'
 		
 		self.setup_joysticks()
-		self.setup_level(3, 4)
+		self.setup_level(1, 3)
 
 	def find_tile_by_coord(self, coord):
 		# It has to return a list because there might be more than one tile in the same place due to different layers
@@ -406,11 +413,15 @@ class Game:
 					self.base_tiles[text[0]] = BaseTile(text)
 
 	def build_portals(self):
+		# To be fed via file in the future
+
 		if self.curr_level == 'level_1':
-			self.add_portal(4, 10, 'level_2_PORTAL_9_2')
+			self.add_portal(4, 10, 'level_2_PORTAL_3_4')
+			self.add_portal(8, 12, 'level_2_PORTAL_9_8')
 
 		if self.curr_level == 'level_2':
-			self.add_portal(9, 1, 'level_1_PORTAL_4_11')
+			self.add_portal(3, 3, 'level_1_PORTAL_4_11')
+			self.add_portal(9, 7, 'level_1_PORTAL_8_13')
 
 
 	def add_portal(self, x, y, portal_tag):
@@ -467,14 +478,23 @@ class Game:
 		self.load_tiles()
 		self.build_map()
 		self.build_portals()
-		self.allplayers.empty()
-		self.player = Player(spawn_x, spawn_y, self)
+		self.player.reset(spawn_x, spawn_y)
 		self.camera = Camera(self)
+
+
+	def show_curr_tile(self):
+		# For debugging/mapbuilding only
+		for player in self.allplayers:
+			print(player.curr_tile)
 
 
 	def update(self):
 		self.allsprites.update()
 		self.camera.update(self.player)
+
+		# Comment out if not debugging/mapbuilding
+		# self.show_curr_tile()
+
 
 	def draw(self):
 		self.screen.fill((0, 0, 0))
