@@ -3,9 +3,6 @@
 
 
 """
-	
-	basetiles must be cleared and reloaded every time a new map is loaded!! currently they are loaded once and never again
-
 	next:
 		vary water tile
 		do 2 missing water tiles
@@ -26,6 +23,7 @@ import os
 import time
 import pickle
 import copy
+import random
 
 
 
@@ -44,7 +42,6 @@ class Utils:
 		x = indexes[0] * Game.TILESIZE
 		y = indexes[1] * Game.TILESIZE
 		return x, y
-
 
 class Camera:
 	def __init__(self, game):
@@ -86,6 +83,102 @@ class Camera:
 			self.y = -(self.screen_height - self.map_height) / 2
 
 
+
+class CatchNeedle(pygame.sprite.Sprite):
+	def __init__(self, game, difficulty, succes_edges):
+		self.game = game
+		self.groups = game.allsprites, game.allneedles
+		pygame.sprite.Sprite.__init__(self, self.groups)
+
+		self.image = pygame.Surface((10, 45))
+		self.image.fill((255, 0, 128))
+		self.rect = self.image.get_rect(topleft=(0, Game.SCREENHEIGHT - 65))
+		self.succes_edges = succes_edges
+
+		self.dir = 1
+		# self.speed = difficulty + 10
+		self.speed = 1
+		self.stopped = False
+
+	def update(self):
+		if self.stopped:
+			return
+
+		dx = self.dir * self.speed * self.game.dt
+		if abs(dx) < 1:
+			dx = self.dir
+		self.rect.x += dx
+
+		if (self.rect.x <= 0 and self.dir < 0) or (self.rect.x >= Game.SCREENWIDTH - self.rect.width and self.dir > 0):
+			self.dir *= -1
+
+	def stop(self):
+		self.stopped = True
+
+	def success(self):
+		if self.rect.right < self.succes_edges[0]:
+			return False
+		if self.rect.left > self.succes_edges[1]:
+			return False
+		return True
+
+
+
+class Pokemon(pygame.sprite.Sprite):
+	MAIN_PATH = os.path.join(os.path.dirname(__file__), 'assets/pokemon/')
+	INDIVIDUAL_PATH =  {1: 'bulbasaur.png',
+						4: 'charmander.png',
+						7: 'squirtle.png',
+						25: 'pikachu.png'
+						}
+
+	def __init__(self, game, dex_id):
+		self.game = game
+		self.groups = game.allsprites, game.allpokemon
+		pygame.sprite.Sprite.__init__(self, self.groups)
+
+		self.dex_id = dex_id
+		self.image = pygame.image.load(Pokemon.MAIN_PATH + Pokemon.INDIVIDUAL_PATH[self.dex_id])
+		self.rect = self.image.get_rect(centerx=(Game.SCREENWIDTH / 2), centery=(Game.SCREENHEIGHT / 3))
+
+		self.difficulty = 0
+		self.green_bar_edges = (Game.SCREENWIDTH / 3, Game.SCREENWIDTH * 2 / 3)
+		self.catch_needle = CatchNeedle(self.game, self.difficulty, self.green_bar_edges)
+
+		self.set_difficulty()
+
+	def set_difficulty(self):
+		if self.dex_id in (1, 4, 7):
+			self.difficulty = 0
+		elif self.dex_id in (25, 25):
+			self.difficulty = 1
+
+	def get_catch_bar(self):
+		# to use difficulty in the future
+		green_bar_width = self.green_bar_edges[1] - self.green_bar_edges[0]
+		red_bar_width = (Game.SCREENWIDTH - green_bar_width) / 2
+		bar_height = 15
+		bar_top = Game.SCREENHEIGHT - 50
+
+		green_bar = pygame.Surface((green_bar_width, bar_height))
+		green_bar.fill((0, 255, 0))
+		left_red_bar = pygame.Surface((red_bar_width, bar_height))
+		left_red_bar.fill((255, 0, 0))
+		right_red_bar = pygame.Surface((red_bar_width, bar_height))
+		right_red_bar.fill((255, 0, 0))
+
+		ret_surface = pygame.Surface((Game.SCREENWIDTH, bar_height))
+		ret_surface.blit(left_red_bar, (0, 0))
+		ret_surface.blit(green_bar, (red_bar_width, 0))
+		ret_surface.blit(right_red_bar, (red_bar_width + green_bar_width, 0))
+
+		ret_rect = pygame.Rect(0, bar_top, Game.SCREENWIDTH, bar_height)
+
+		return ret_surface, ret_rect
+
+
+
+
 class Player(pygame.sprite.Sprite):
 	IMG =  {Utils.RIGHT:	[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_right_0.png')),
 						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_right_1.png'))],
@@ -125,7 +218,13 @@ class Player(pygame.sprite.Sprite):
 		self.target_x = None
 		self.target_y = None
 
+		self.curr_pokemon = None
+		self.curr_needle = None
+
 	def get_dir(self):
+		if self.game.fight_mode:
+			return
+
 		# Don't accept input if player is already moving
 		if self.dir != [0, 0]:
 			return
@@ -189,7 +288,32 @@ class Player(pygame.sprite.Sprite):
 		return True
 
 
+	def fight(self):
+		if not self.game.fight_mode:
+			return
+
+		keys = pygame.key.get_pressed()
+
+		if keys[pygame.K_q]:
+			self.game.fight_mode = False
+			self.curr_pokemon.kill()
+			self.curr_pokemon = None
+			self.curr_needle.kill()
+			self.curr_needle = None
+
+		elif keys[pygame.K_SPACE]:
+			self.curr_needle.stop()
+			if self.curr_needle.success():
+				print('Caught!')
+			else:
+				print('Missed!')
+
+
+
 	def move(self):
+		if self.game.fight_mode:
+			return
+
 		if self.dir != [0, 0] and time.time() - self.last_movement >= Player.MOVEMENT_COOLDOWN and not self.target_tile:
 			self.target_tile = [0, 0]
 			self.target_tile[0] = self.curr_tile[0] + self.dir[0]
@@ -237,21 +361,32 @@ class Player(pygame.sprite.Sprite):
 				if self.dir != old_dir:
 					self.anim_frame = 0
 
-				# Portals
+				# Special actions
 				for tile in self.game.find_tile_by_coord(self.curr_tile):
 					if tile.tile_data:
 						for tag in tile.tile_data:
 							if 'PORTAL' in tag:
-								# Portal tag format: NEWLEVELNAME_PORTAL_SPAWNX_SPAWNY_FACING
-								tag_string = tag.split('_')
+								self.go_through_portal(tag)
 
-								spawn_x = int(tag_string[-3])
-								spawn_y = int(tag_string[-2])
-								facing = int(tag_string[-1])
-								new_level = '_'.join(tag_string[:-4])
+							if 'POKEMON_SPAWN_POINT' in tag:
+								# This avoids a bug where by having a nonzero dir, it "moves" to the current tile that spawned a pokemon thus spawning a second one
+								# it also prevents the player from moving after fighting a pokemon
+								self.dir = [0, 0]
+								self.game.spawn_pokemon(tile.tile_data)
 
-								self.game.curr_level = new_level
-								self.game.setup_level(spawn_x, spawn_y, facing)
+
+	def go_through_portal(self, portal_tag):
+		# Portal tag format: NEWLEVELNAME_PORTAL_SPAWNX_SPAWNY_FACING
+		tag_string = portal_tag.split('_')
+
+		spawn_x = int(tag_string[-3])
+		spawn_y = int(tag_string[-2])
+		facing = int(tag_string[-1])
+		new_level = '_'.join(tag_string[:-4])
+
+		self.game.curr_level = new_level
+		self.game.setup_level(spawn_x, spawn_y, facing)
+
 
 
 	def reset(self, spawn_x, spawn_y, facing):
@@ -292,6 +427,7 @@ class Player(pygame.sprite.Sprite):
 		self.image = Player.IMG[self.facing][self.anim_frame]
 
 	def update(self):
+		self.fight()
 		self.get_dir()
 		self.move()
 		self.update_sprite()
@@ -329,6 +465,7 @@ class Tile(pygame.sprite.Sprite):
 		self.coord = self.util.index_to_coord((self.x, self.y))
 		self.tile_data = self.game.base_tiles[tile_name].tile_data
 		self.print_above_player = True if 'TOP_LAYER' in self.tile_data else False
+		self.invisible = True if 'INVISIBLE' in self.tile_data else False
 
 		self.images = list()
 		self.find_images()
@@ -364,8 +501,8 @@ class Tile(pygame.sprite.Sprite):
 
 class Game:
 	TILESIZE = 32
-	SCREENWIDTH = TILESIZE * 11 # 32
-	SCREENHEIGHT = TILESIZE * 10 # 24
+	SCREENWIDTH = TILESIZE * 11 # 11
+	SCREENHEIGHT = TILESIZE * 10 # 10
 
 	def __init__(self):
 		pygame.init()
@@ -387,6 +524,8 @@ class Game:
 		# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
 		self.allplayers = pygame.sprite.Group()
+		self.allpokemon = pygame.sprite.Group()
+		self.allneedles = pygame.sprite.Group()
 		self.allsprites = pygame.sprite.Group()
 
 		self.player = Player(self, 0, 0)
@@ -404,12 +543,53 @@ class Game:
 		self.vert_tiles = 0
 		self.alltiles = pygame.sprite.Group()
 
+		self.fight_mode = False
+		self.fight_background = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokemon/fight_background.png'))
+
 		self.tile_layers = []
 
 		self.curr_level = 'level_1'
 		
 		self.setup_joysticks()
 		self.setup_level(1, 1, self.util.DOWN)
+		# self.setup_level(4, 11, self.util.DOWN)
+
+	def spawn_pokemon(self, pokemon_tag):
+		common_odds = 0
+		uncommon_odds = 0
+
+		if 'COMMON' in pokemon_tag:
+			common_odds += 0.2
+		if 'UNCOMMON' in pokemon_tag:
+			common_odds += 0.1
+			uncommon_odds += 0.1
+
+		if random.random() < common_odds:
+			self.start_fight(random.choice((1, 4, 7)))
+
+		elif random.random() < uncommon_odds:
+			self.start_fight(random.choice((25, 25)))
+
+
+	def start_fight(self, dex_id):
+		self.fight_mode = True
+		self.play_fight_transition()
+		new_mon = Pokemon(self, dex_id)
+		self.player.curr_pokemon = new_mon
+		self.player.curr_needle = new_mon.catch_needle
+
+
+	def play_fight_transition(self):
+		thickness = 1
+
+		while thickness < min(Game.SCREENWIDTH, Game.SCREENHEIGHT):
+			pygame.draw.rect(self.screen, (0, 0, 0), pygame.Rect(0, 0, Game.SCREENWIDTH, Game.SCREENHEIGHT), thickness)
+			pygame.display.flip()
+			thickness += 10
+			pygame.time.wait(35)
+
+
+
 
 	def find_tile_by_coord(self, coord):
 		# It has to return a list because there might be more than one tile in the same place due to different layers
@@ -510,7 +690,7 @@ class Game:
 		self.build_portals()
 		self.player.reset(spawn_x, spawn_y, facing)
 		self.camera = Camera(self)
-
+		self.fight_mode = False
 
 	def show_curr_tile(self):
 		# For debugging/mapbuilding only
@@ -529,21 +709,34 @@ class Game:
 	def draw(self):
 		self.screen.fill((0, 0, 0))
 
-		# Draw everything 'below' the player
-		for layer in self.tile_layers:
-			for tile in layer:
-				if not tile.print_above_player:
-					self.screen.blit(tile.image, self.camera.apply(tile))	
+		if self.fight_mode:
+			self.screen.blit(self.fight_background, (0, 0))
 
-		# Draw the player
-		for sprite in self.allplayers:
-			self.screen.blit(sprite.image, self.camera.apply(sprite))
+			for sprite in self.allpokemon:
+				self.screen.blit(sprite.image, sprite.rect)
 
-		# Draw everything 'above' the player
-		for layer in self.tile_layers:
-			for tile in layer:
-				if tile.print_above_player:
-					self.screen.blit(tile.image, self.camera.apply(tile))	
+				bar_surf, bar_rect = sprite.get_catch_bar()
+				self.screen.blit(bar_surf, bar_rect)
+
+			for sprite in self.allneedles:
+				self.screen.blit(sprite.image, sprite.rect)				
+
+		else:
+			# Draw everything 'below' the player
+			for layer in self.tile_layers:
+				for tile in layer:
+					if not tile.print_above_player and not tile.invisible:
+						self.screen.blit(tile.image, self.camera.apply(tile))	
+
+			# Draw the player
+			for sprite in self.allplayers:
+				self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+			# Draw everything 'above' the player
+			for layer in self.tile_layers:
+				for tile in layer:
+					if tile.print_above_player and not tile.invisible:
+						self.screen.blit(tile.image, self.camera.apply(tile))	
 		
 		pygame.display.flip()
 

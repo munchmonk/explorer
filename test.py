@@ -1,39 +1,14 @@
 #!/Library/Frameworks/Python.framework/Versions/2.7/bin/python2.7
 # coding: utf-8
 
-a = 'water_mid_0.png'
-b = 'water_mid_13.png'
+import pygame
+pygame.init()
 
-import difflib
+class Test(pygame.sprite.Sprite):
+	def __init__(self):
+		self.groups = allplayers
+		pygame.sprite.Sprite.__init__(self, self.groups)
+		print('created')
 
-d = ''.join([s for s in difflib.ndiff(a, b) if s[0] != ' '])
-d = ''.join([c for c in d if c not in '+-'])
-d = d.replace(' ', '')
-
-# print(str.isdigit(d))
-
-
-
-
-def func(a):
-	print(a[0], a[1])
-
-# func((13, 12))
-
-
-a = [1, 2, 3, 4, 5]
-b = [2, 7]
-
-
-a = 'level_2_3_3'
-a = 'ciao'
-b = 'mamma'
-c = 'bye'
-
-d = '_'.join([a, b, c])
-print(d)
-
-0 = problema
-1 = problema
-2 = problema
-3 = problema
+allplayers = pygame.sprite.Group()
+Test()
