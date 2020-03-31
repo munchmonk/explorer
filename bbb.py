@@ -275,7 +275,7 @@ class Player(pygame.sprite.Sprite):
 					tags.append(tag)
 
 		# To be extended
-		if any(tag in ('WATER') for tag in tags):
+		if any(tag in ('WATER', 'BOULDER', 'ROCK') for tag in tags):
 			return False
 
 		if 'TREE' in tags and 'BOTTOM' in tags:
@@ -628,6 +628,10 @@ class Game:
 
 		if self.curr_level == 'forest':
 			self.add_portal(1, 19, 'level_1_PORTAL_1_1', self.util.DOWN)
+			self.add_portal(18, 0, 'cave_PORTAL_3_14', self.util.UP)
+
+		if self.curr_level == 'cave':
+			self.add_portal(3, 15, 'forest_PORTAL_18_1', self.util.DOWN)
 
 	def add_portal(self, x, y, portal_tag, facing):
 		# N.B. use deep copies for tile tags

@@ -1,0 +1,15 @@
+boulder_bottom.png BOULDER
+boulder_bottomleft.png BOULDER
+boulder_bottomright.png BOULDER
+boulder_left.png BOULDER
+boulder_mid.png BOULDER
+boulder_right.png BOULDER
+boulder_top.png BOULDER
+boulder_topleft.png BOULDER
+boulder_topright.png BOULDER
+boulder_curve_bottomleft.png BOULDER
+boulder_curve_bottomright.png BOULDER
+boulder_curve_topleft.png BOULDER
+boulder_curve_topright.png BOULDER
+ground.png GROUND
+rock.png ROCK
