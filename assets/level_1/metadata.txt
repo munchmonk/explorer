@@ -12,24 +12,24 @@ grass_3.png GRASS
 grass_4.png GRASS
 grass_5.png GRASS
 
-water_grass_bottom_0.png 	ANIM_WATER_GRASS_BOTTOM 0 WATER
-water_grass_bottom_1.png 	ANIM_WATER_GRASS_BOTTOM 1 WATER
-water_grass_bottomleft_0.png 	ANIM_WATER_GRASS_BOTTOMLEFT 0 WATER
-water_grass_bottomleft_1.png 	ANIM_WATER_GRASS_BOTTOMLEFT 1 WATER
-water_grass_bottomright_0.png 	ANIM_WATER_GRASS_BOTTOMRIGHT 0 WATER
-water_grass_bottomright_1.png 	ANIM_WATER_GRASS_BOTTOMRIGHT 1 WATER
-water_grass_left_0.png 	ANIM_WATER_GRASS_LEFT 0 WATER
-water_grass_left_1.png 	ANIM_WATER_GRASS_LEFT 1 WATER
-water_grass_right_0.png 	ANIM_WATER_GRASS_RIGHT 0 WATER
-water_grass_right_1.png 	ANIM_WATER_GRASS_RIGHT 1 WATER
-water_grass_top_0.png 		ANIM_WATER_GRASS_TOP 0 WATER
-water_grass_top_1.png 		ANIM_WATER_GRASS_TOP 1 WATER
-water_grass_topleft_0.png 	ANIM_WATER_GRASS_TOPLEFT 0 WATER
-water_grass_topleft_1.png 	ANIM_WATER_GRASS_TOPLEFT 1 WATER
-water_grass_topright_0.png 	ANIM_WATER_GRASS_TOPRIGHT 0 WATER
-water_grass_topright_1.png 	ANIM_WATER_GRASS_TOPRIGHT 1 WATER
-water_mid_0.png 		ANIM_WATER_MID 0 WATER
-water_mid_1.png 		ANIM_WATER_MID 1 WATER
+water_bottom_0.png ANIM_WATER_BOTTOM 0 WATER
+water_bottomleft_0.png ANIM_WATER_BOTTOMLEFT 0 WATER
+water_bottomright_0.png ANIM_WATER_BOTTOMRIGHT 0 WATER
+water_left_0.png ANIM_WATER_LEFT 0 WATER
+water_right_0.png ANIM_WATER_RIGHT 0 WATER
+water_top_0.png ANIM_WATER_TOP 0 WATER
+water_topleft_0.png ANIM_WATER_TOPLEFT 0 WATER
+water_topright_0.png ANIM_WATER_TOPRIGH 0 WATER
+water_mid_0.png ANIM_WATER_MID 0 WATER
+water_bottom_1.png ANIM_WATER_BOTTOM 1 WATER
+water_bottomleft_1.png ANIM_WATER_BOTTOMLEFT 1 WATER
+water_bottomright_1.png ANIM_WATER_BOTTOMRIGHT 1 WATER
+water_left_1.png ANIM_WATER_LEFT 1 WATER
+water_right_1.png ANIM_WATER_RIGHT 1 WATER
+water_top_1.png ANIM_WATER_TOP 1 WATER
+water_topleft_1.png ANIM_WATER_TOPLEFT 1 WATER
+water_topright_1.png ANIM_WATER_TOPRIGHT 1 WATER
+water_mid_1.png ANIM_WATER_MID 1 WATER
 
 tree_top_0.png ANIM_TREE_TOP 0 TREE TOP TOP_LAYER
 tree_top_1.png ANIM_TREE_TOP 1 TREE TOP TOP_LAYER
@@ -39,7 +39,6 @@ tree_bottom_0.png ANIM_TREE_BOTTOM 0 TREE BOTTOM
 tree_bottom_1.png ANIM_TREE_BOTTOM 1 TREE BOTTOM
 tree_bottom_2.png ANIM_TREE_BOTTOM 2 TREE BOTTOM
 tree_bottom_3.png ANIM_TREE_BOTTOM 3 TREE BOTTOM
-
 
 dirt_path_top.png DIRT_PATH 
 dirt_path_mid.png DIRT_PATH 

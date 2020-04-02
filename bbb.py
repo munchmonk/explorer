@@ -30,6 +30,7 @@ import random
 
 class Utils:
 	RIGHT, LEFT, UP, DOWN = range(4)
+	# TRANSPARENT = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/misc/transparent.png'))
 
 	def __init__(self):
 		pass
@@ -126,7 +127,8 @@ class CatchNeedle(pygame.sprite.Sprite):
 
 class Pokemon(pygame.sprite.Sprite):
 	MAIN_PATH = os.path.join(os.path.dirname(__file__), 'assets/pokemon/')
-	INDIVIDUAL_PATH =  {1: 'bulbasaur.png',
+	INDIVIDUAL_PATH =  {0: 'transparent.png',
+						1: 'bulbasaur.png',
 						4: 'charmander.png',
 						7: 'squirtle.png',
 						25: 'pikachu.png'
@@ -140,21 +142,31 @@ class Pokemon(pygame.sprite.Sprite):
 		self.dex_id = dex_id
 		self.image = pygame.image.load(Pokemon.MAIN_PATH + Pokemon.INDIVIDUAL_PATH[self.dex_id])
 		self.rect = self.image.get_rect(centerx=(Game.SCREENWIDTH / 2), centery=(Game.SCREENHEIGHT / 3))
+		self.transparent = False
 
 		self.difficulty = 0
-		self.green_bar_edges = (Game.SCREENWIDTH / 3, Game.SCREENWIDTH * 2 / 3)
+		self.green_bar_edges = (0, 0)
+		self.set_difficulty()
+
 		self.catch_needle = CatchNeedle(self.game, self.difficulty, self.green_bar_edges)
 
-		self.set_difficulty()
+	def update(self):
+		if self.transparent:
+			self.image = pygame.image.load(Pokemon.MAIN_PATH + Pokemon.INDIVIDUAL_PATH[0])
+
+	def set_transparent(self):
+		self.transparent = True
+		
 
 	def set_difficulty(self):
 		if self.dex_id in (1, 4, 7):
 			self.difficulty = 0
+			self.green_bar_edges = (Game.SCREENWIDTH * 1 / 3, Game.SCREENWIDTH * 2 / 3)
 		elif self.dex_id in (25, 25):
 			self.difficulty = 1
+			self.green_bar_edges = (Game.SCREENWIDTH * 3 / 7, Game.SCREENWIDTH * 4 / 7)
 
 	def get_catch_bar(self):
-		# to use difficulty in the future
 		green_bar_width = self.green_bar_edges[1] - self.green_bar_edges[0]
 		red_bar_width = (Game.SCREENWIDTH - green_bar_width) / 2
 		bar_height = 15
@@ -177,6 +189,67 @@ class Pokemon(pygame.sprite.Sprite):
 		return ret_surface, ret_rect
 
 
+class Pokeball(pygame.sprite.Sprite):
+	OPEN, HALF_OPEN, CLOSED, TRANSPARENT = 'open', 'half_open', 'closed', 'transparent'
+
+	IMG =  {OPEN: pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_open.png')),
+			HALF_OPEN: pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_half_open.png')),
+			CLOSED: pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_closed.png')),
+			TRANSPARENT: pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/transparent.png'))}
+
+	def __init__(self, game, pokemon, success):
+		self.game = game
+		self.groups = game.allsprites, game.allpokeballs
+		pygame.sprite.Sprite.__init__(self, self.groups)
+
+		self.success = success
+		self.state = Pokeball.OPEN
+		self.image = None
+		self.set_image()
+		self.rect = self.image.get_rect(centerx=Game.SCREENWIDTH / 2, top=Game.SCREENHEIGHT)
+		self.pokemon = pokemon
+
+		self.speed = -0.6
+		self.dead = False
+		self.kill_timer = 0
+
+	def set_image(self):
+		self.image = Pokeball.IMG[self.state]
+
+	def update(self):
+		# Movement
+		dy = 0
+		if self.speed > 0:
+			dy = max(self.speed * self.game.dt, 1)
+		elif self.speed < 0:
+			dy = min(self.speed * self.game.dt, -1)
+
+		self.rect.y += dy
+
+		# Going up
+		if self.state == Pokeball.OPEN and self.rect.y <= 15:
+			self.state = Pokeball.HALF_OPEN
+			self.set_image()
+			self.speed = 0.15
+
+		# Going down
+		if self.state == Pokeball.HALF_OPEN and self.rect.y >= 100:
+			if self.success:
+				self.state = Pokeball.CLOSED
+				self.set_image()
+				self.speed = 0
+				self.pokemon.set_transparent()
+			else:
+				self.state = Pokeball.TRANSPARENT
+				self.set_image()
+
+			self.kill_timer = time.time()
+
+		if self.kill_timer > 0 and time.time() - self.kill_timer > 1.5:
+			self.dead = True
+			self.kill()
+
+
 
 
 class Player(pygame.sprite.Sprite):
@@ -193,6 +266,10 @@ class Player(pygame.sprite.Sprite):
 			Utils.DOWN: 	[pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_0.png')),
 						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_1.png')),
 						 	pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/player/player_down_2.png'))]}
+
+	POKEBALL_IMG = {'open': pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_open.png')),
+					'half_open': pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_half_open.png')),
+					'closed': pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokeballs/pokeball_closed.png'))}
 
 	MOVEMENT_COOLDOWN = 0.1
 	SPEED = 0.1
@@ -220,8 +297,10 @@ class Player(pygame.sprite.Sprite):
 
 		self.curr_pokemon = None
 		self.curr_needle = None
+		self.curr_pokeball = None
+		self.pokemon_caught = list()
 
-	def get_dir(self):
+	def get_input(self):
 		if self.game.fight_mode:
 			return
 
@@ -238,6 +317,8 @@ class Player(pygame.sprite.Sprite):
 			self.dir = [0, 1]
 		elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
 			self.dir = [1, 0]
+		elif keys[pygame.K_p]:
+			print(self.pokemon_caught)
 
 		if self.game.joysticks:
 			if self.game.joysticks[0].get_axis(0) > 0.5:
@@ -249,6 +330,9 @@ class Player(pygame.sprite.Sprite):
 			if self.game.joysticks[0].get_axis(1) < -0.5:
 				self.dir = [0, -1]
 
+		self.set_facing()
+
+	def set_facing(self):
 		if self.dir == [1, 0]:
 			self.facing = self.util.RIGHT
 		elif self.dir == [-1, 0]:
@@ -274,7 +358,6 @@ class Player(pygame.sprite.Sprite):
 				for tag in t.tile_data:
 					tags.append(tag)
 
-		# To be extended
 		if any(tag in ('WATER', 'BOULDER', 'ROCK') for tag in tags):
 			return False
 
@@ -294,19 +377,30 @@ class Player(pygame.sprite.Sprite):
 
 		keys = pygame.key.get_pressed()
 
-		if keys[pygame.K_q]:
-			self.game.fight_mode = False
-			self.curr_pokemon.kill()
-			self.curr_pokemon = None
-			self.curr_needle.kill()
-			self.curr_needle = None
+		if keys[pygame.K_q] and not self.curr_pokeball:
+			self.exit_fight_mode()
 
-		elif keys[pygame.K_SPACE]:
+		elif keys[pygame.K_SPACE] and not self.curr_pokeball:
 			self.curr_needle.stop()
+			self.curr_pokeball = Pokeball(self.game, self.curr_pokemon, self.curr_needle.success())
+
+		if self.curr_needle.stopped:
 			if self.curr_needle.success():
-				print('Caught!')
-			else:
-				print('Missed!')
+				if self.curr_pokemon.dex_id not in self.pokemon_caught:
+					self.pokemon_caught.append(self.curr_pokemon.dex_id)
+					self.pokemon_caught.sort()
+			if self.curr_pokeball.dead:
+				self.curr_pokeball = None
+				self.exit_fight_mode()
+
+	
+
+	def exit_fight_mode(self):
+		self.game.fight_mode = False
+		self.curr_pokemon.kill()
+		self.curr_pokemon = None
+		self.curr_needle.kill()
+		self.curr_needle = None
 
 
 
@@ -357,7 +451,7 @@ class Player(pygame.sprite.Sprite):
 				# This helps keeping the walking animation smooth instead of restarting it every tile
 				old_dir = self.dir
 				self.dir = [0, 0]
-				self.get_dir()
+				self.get_input()
 				if self.dir != old_dir:
 					self.anim_frame = 0
 
@@ -428,7 +522,7 @@ class Player(pygame.sprite.Sprite):
 
 	def update(self):
 		self.fight()
-		self.get_dir()
+		self.get_input()
 		self.move()
 		self.update_sprite()
 
@@ -487,7 +581,6 @@ class Tile(pygame.sprite.Sprite):
 				if base_tile.tile_data[0] != self.tile_data[0] and base_tile.tile_data[1] == self.tile_data[1] and base_tile.image not in self.images:
 					self.images.insert(int(base_tile.tile_data[2]), base_tile.image)
 
-
 	def update(self):
 		if len(self.images) > 1:
 			if time.time() - self.last_anim > Tile.ANIMFRAME_COOLDOWN:
@@ -526,6 +619,7 @@ class Game:
 		self.allplayers = pygame.sprite.Group()
 		self.allpokemon = pygame.sprite.Group()
 		self.allneedles = pygame.sprite.Group()
+		self.allpokeballs = pygame.sprite.Group()
 		self.allsprites = pygame.sprite.Group()
 
 		self.player = Player(self, 0, 0)
@@ -557,19 +651,39 @@ class Game:
 	def spawn_pokemon(self, pokemon_tag):
 		common_odds = 0
 		uncommon_odds = 0
+		rare_odds = 0
 
 		if 'COMMON' in pokemon_tag:
 			common_odds += 0.2
-		if 'UNCOMMON' in pokemon_tag:
+			uncommon_odds += 0.01
+		elif 'UNCOMMON' in pokemon_tag:
 			common_odds += 0.1
 			uncommon_odds += 0.1
+		elif 'RARE' in pokemon_tag:
+			uncommon_odds += 0.2
+			rare_odds += 0.05
 
-		if random.random() < common_odds:
-			self.start_fight(random.choice((1, 4, 7)))
+		common_pool, uncommon_pool, rare_pool = self.populate_spawn_pools()
 
-		elif random.random() < uncommon_odds:
-			self.start_fight(random.choice((25, 25)))
+		if random.random() < rare_odds and rare_pool:
+			self.start_fight(random.choice(rare_pool))
+		elif random.random() < uncommon_odds and uncommon_pool:
+			self.start_fight(random.choice(uncommon_pool))
+		elif random.random() < common_odds and common_pool:
+			self.start_fight(random.choice(common_pool))
 
+
+	def populate_spawn_pools(self):
+		common_pool = list()
+		uncommon_pool = list()
+		rare_pool = list()
+
+		if self.curr_level == 'forest':
+			common_pool += [1, 4, 7]
+			uncommon_pool += [25]
+
+		return common_pool, uncommon_pool, rare_pool
+	
 
 	def start_fight(self, dex_id):
 		self.fight_mode = True
@@ -723,6 +837,9 @@ class Game:
 				self.screen.blit(bar_surf, bar_rect)
 
 			for sprite in self.allneedles:
+				self.screen.blit(sprite.image, sprite.rect)
+
+			for sprite in self.allpokeballs:
 				self.screen.blit(sprite.image, sprite.rect)				
 
 		else:
