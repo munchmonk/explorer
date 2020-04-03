@@ -30,8 +30,7 @@ import random
 
 class Utils:
 	RIGHT, LEFT, UP, DOWN = range(4)
-	# TRANSPARENT = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/misc/transparent.png'))
-
+	
 	def __init__(self):
 		pass
 
@@ -245,7 +244,7 @@ class Pokeball(pygame.sprite.Sprite):
 
 			self.kill_timer = time.time()
 
-		if self.kill_timer > 0 and time.time() - self.kill_timer > 1.5:
+		if self.kill_timer > 0 and time.time() - self.kill_timer > 2.5:
 			self.dead = True
 			self.kill()
 
@@ -300,37 +299,56 @@ class Player(pygame.sprite.Sprite):
 		self.curr_pokeball = None
 		self.pokemon_caught = list()
 
-	def get_input(self):
-		if self.game.fight_mode:
-			return
+		self.last_pokedex_scroll = 0
 
+	def get_input(self):
 		# Don't accept input if player is already moving
 		if self.dir != [0, 0]:
 			return
 
 		keys = pygame.key.get_pressed()
-		if keys[pygame.K_w] or keys[pygame.K_UP]:
-			self.dir = [0, -1]
-		elif keys[pygame.K_a] or keys[pygame.K_LEFT]:
-			self.dir = [-1, 0]
-		elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
-			self.dir = [0, 1]
-		elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-			self.dir = [1, 0]
-		elif keys[pygame.K_p]:
-			print(self.pokemon_caught)
 
-		if self.game.joysticks:
-			if self.game.joysticks[0].get_axis(0) > 0.5:
-				self.dir = [1, 0]
-			if self.game.joysticks[0].get_axis(0) < -0.5:
-				self.dir = [-1, 0]
-			if self.game.joysticks[0].get_axis(1) > 0.5:
-				self.dir = [0, 1]
-			if self.game.joysticks[0].get_axis(1) < -0.5:
+		# Fight mode
+		if self.game.fight_mode:
+			if keys[pygame.K_q] and not self.curr_pokeball:
+				self.exit_fight_mode()
+			elif keys[pygame.K_SPACE] and not self.curr_pokeball:
+				self.throw_pokeball()
+
+		# Pokedex mode
+		if self.game.pokedex_mode:
+			if keys[pygame.K_q]:
+				self.exit_pokedex_mode()
+			elif keys[pygame.K_w] and time.time() - self.last_pokedex_scroll > 0.15:
+				self.move_up_pokedex()
+			elif keys[pygame.K_s] and time.time() - self.last_pokedex_scroll > 0.15:
+				self.move_down_pokedex()
+
+
+		# Walking mode
+		else:
+			if keys[pygame.K_w] or keys[pygame.K_UP]:
 				self.dir = [0, -1]
+			elif keys[pygame.K_a] or keys[pygame.K_LEFT]:
+				self.dir = [-1, 0]
+			elif keys[pygame.K_s] or keys[pygame.K_DOWN]:
+				self.dir = [0, 1]
+			elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+				self.dir = [1, 0]
+			elif keys[pygame.K_p]:
+				self.game.pokedex_mode = True
 
-		self.set_facing()
+			if self.game.joysticks:
+				if self.game.joysticks[0].get_axis(0) > 0.5:
+					self.dir = [1, 0]
+				if self.game.joysticks[0].get_axis(0) < -0.5:
+					self.dir = [-1, 0]
+				if self.game.joysticks[0].get_axis(1) > 0.5:
+					self.dir = [0, 1]
+				if self.game.joysticks[0].get_axis(1) < -0.5:
+					self.dir = [0, -1]
+
+			self.set_facing()
 
 	def set_facing(self):
 		if self.dir == [1, 0]:
@@ -371,18 +389,14 @@ class Player(pygame.sprite.Sprite):
 		return True
 
 
-	def fight(self):
+	def throw_pokeball(self):
+		self.curr_needle.stop()
+		self.curr_pokeball = Pokeball(self.game, self.curr_pokemon, self.curr_needle.success())
+
+
+	def update_fight(self):
 		if not self.game.fight_mode:
-			return
-
-		keys = pygame.key.get_pressed()
-
-		if keys[pygame.K_q] and not self.curr_pokeball:
-			self.exit_fight_mode()
-
-		elif keys[pygame.K_SPACE] and not self.curr_pokeball:
-			self.curr_needle.stop()
-			self.curr_pokeball = Pokeball(self.game, self.curr_pokemon, self.curr_needle.success())
+			return 
 
 		if self.curr_needle.stopped:
 			if self.curr_needle.success():
@@ -393,7 +407,26 @@ class Player(pygame.sprite.Sprite):
 				self.curr_pokeball = None
 				self.exit_fight_mode()
 
-	
+	def update_pokedex(self):
+		if not self.game.pokedex_mode:
+			return
+
+		if not self.game.pokedex:
+			self.game.pokedex = self.game.get_pokedex()
+
+
+	def move_up_pokedex(self):
+		if self.game.curr_pokedex_selection > 0:
+			self.game.curr_pokedex_selection -= 1
+			self.last_pokedex_scroll = time.time()
+
+
+
+	def move_down_pokedex(self):
+		if self.game.curr_pokedex_selection < len(self.game.pokedex) - 1:
+			self.game.curr_pokedex_selection += 1
+			self.last_pokedex_scroll = time.time()
+
 
 	def exit_fight_mode(self):
 		self.game.fight_mode = False
@@ -402,6 +435,9 @@ class Player(pygame.sprite.Sprite):
 		self.curr_needle.kill()
 		self.curr_needle = None
 
+	def exit_pokedex_mode(self):
+		self.game.pokedex_mode = False
+		self.game.pokedex = []
 
 
 	def move(self):
@@ -521,21 +557,15 @@ class Player(pygame.sprite.Sprite):
 		self.image = Player.IMG[self.facing][self.anim_frame]
 
 	def update(self):
-		self.fight()
 		self.get_input()
 		self.move()
+		self.update_fight()
+		self.update_pokedex()
 		self.update_sprite()
-
-	def draw(self):
-		pass
-
 
 
 
 class BaseTile:
-	# Obviously level will have to be fed into __init__ in the future
-	# PATH = os.path.join('assets', 'level_1')
-
 	def __init__(self, tile_data, level):
 		self.tile_data = tile_data
 		level_path = os.path.join('assets', level)
@@ -603,7 +633,6 @@ class Game:
 		# Playing on Mac - fullscreen
 		if (1280, 800) in pygame.display.list_modes():
 			# self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-			# self.screen = pygame.display.set_mode((32 * 15, 32 * 12))
 			self.screen = pygame.display.set_mode((Game.SCREENWIDTH, Game.SCREENHEIGHT))
 
 		# Playing on TV - 1024 x 768
@@ -639,6 +668,15 @@ class Game:
 
 		self.fight_mode = False
 		self.fight_background = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokemon/fight_background.png'))
+
+		self.pokedex = []
+		self.pokedex_mode = False
+		self.curr_pokedex_selection = None
+		self.pokedex_background = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokemon/pokedex_background.png')) 
+		self.unknown_pokemon = pygame.image.load(os.path.join(os.path.dirname(__file__), 'assets/pokemon/unknown.png'))
+
+		self.font_size = 16
+		self.myfont = pygame.font.Font(os.path.join(os.path.dirname(__file__), 'assets/misc/manti_sans_fixed.otf'), self.font_size)
 
 		self.tile_layers = []
 
@@ -809,6 +847,9 @@ class Game:
 		self.player.reset(spawn_x, spawn_y, facing)
 		self.camera = Camera(self)
 		self.fight_mode = False
+		self.pokedex_mode = False
+		self.pokedex = []
+		self.curr_pokedex_selection = None
 
 	def show_curr_tile(self):
 		# For debugging/mapbuilding only
@@ -823,52 +864,114 @@ class Game:
 		# Comment out if not debugging/mapbuilding
 		# self.show_curr_tile()
 
+	def draw_fight_mode(self):
+		self.screen.blit(self.fight_background, (0, 0))
+
+		for sprite in self.allpokemon:
+			self.screen.blit(sprite.image, sprite.rect)
+
+			bar_surf, bar_rect = sprite.get_catch_bar()
+			self.screen.blit(bar_surf, bar_rect)
+
+		for sprite in self.allneedles:
+			self.screen.blit(sprite.image, sprite.rect)
+
+		for sprite in self.allpokeballs:
+			self.screen.blit(sprite.image, sprite.rect)
+
+	def get_pokedex(self):
+		empty_string = '----------'
+		pokedex = []
+
+		if not self.player.pokemon_caught:
+			pokedex.append(empty_string)
+
+		else:
+			for i in range(1, self.player.pokemon_caught[-1] + 1):
+				if i in self.player.pokemon_caught:
+					pokedex.append(self.get_pokemon_name(i))
+				else:
+					pokedex.append(empty_string)
+
+		self.curr_pokedex_selection = 0
+		return pokedex
+
+
+
+
+	def draw_pokedex_mode(self):
+		self.screen.blit(self.pokedex_background, (0, 0))
+
+		# # 10 = longest pokemon name (kangaskhan); a manti_sans_fixed with font_size of 16 makes each character 11px wide
+		# # this aligns to the left and rescales if the font has been enlarged
+		left = Game.SCREENWIDTH - 10 * 11 * (self.font_size / 16)
+		centery = Game.SCREENHEIGHT / 2
+
+		# Print currently selected pokemon name
+		surf = self.myfont.render(self.pokedex[self.curr_pokedex_selection], False, (0, 0, 255), (0, 0, 0))
+		self.screen.blit(surf, surf.get_rect(left=left, centery=centery))
+
+		# Print names above
+		for i in range(self.curr_pokedex_selection - 1, -1, -1):
+			surf = self.myfont.render(self.pokedex[i], False, (0, 0, 255))
+			self.screen.blit(surf, surf.get_rect(left=left, centery=centery - (self.curr_pokedex_selection - i) * 20))
+
+		# Print names below
+		for i in range(self.curr_pokedex_selection + 1, len(self.pokedex)):
+			surf = self.myfont.render(self.pokedex[i], False, (0, 0, 255))
+			self.screen.blit(surf, surf.get_rect(left=left, centery=centery + (i - self.curr_pokedex_selection) * 20))
+		
+		# Print pokemon image
+		img = self.unknown_pokemon
+
+		if self.pokedex[self.curr_pokedex_selection][0] != '-':
+			img = pygame.image.load(Pokemon.MAIN_PATH + Pokemon.INDIVIDUAL_PATH[self.curr_pokedex_selection + 1])
+
+		self.screen.blit(img, img.get_rect(left=Game.SCREENWIDTH / 6, centery=centery))
+
+
+	def get_pokemon_name(self, dex_id):
+		all_pokemon =  {1: 'Bulbasaur',
+						4: 'Charmander',
+						7: 'Squirtle',
+						25: 'Pikachu'}
+
+		return all_pokemon[dex_id]
+
+
+
+	def draw_walking_mode(self):
+		# Draw everything 'below' the player
+		for layer in self.tile_layers:
+			for tile in layer:
+				if not tile.print_above_player and not tile.invisible:
+					self.screen.blit(tile.image, self.camera.apply(tile))	
+
+		# Draw the player
+		for sprite in self.allplayers:
+			self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+		# Draw everything 'above' the player
+		for layer in self.tile_layers:
+			for tile in layer:
+				if tile.print_above_player and not tile.invisible:
+					self.screen.blit(tile.image, self.camera.apply(tile))
+
 
 	def draw(self):
 		self.screen.fill((0, 0, 0))
 
 		if self.fight_mode:
-			self.screen.blit(self.fight_background, (0, 0))
+			self.draw_fight_mode()
 
-			for sprite in self.allpokemon:
-				self.screen.blit(sprite.image, sprite.rect)
-
-				bar_surf, bar_rect = sprite.get_catch_bar()
-				self.screen.blit(bar_surf, bar_rect)
-
-			for sprite in self.allneedles:
-				self.screen.blit(sprite.image, sprite.rect)
-
-			for sprite in self.allpokeballs:
-				self.screen.blit(sprite.image, sprite.rect)				
+		elif self.pokedex_mode:
+			self.draw_pokedex_mode()
 
 		else:
-			# Draw everything 'below' the player
-			for layer in self.tile_layers:
-				for tile in layer:
-					if not tile.print_above_player and not tile.invisible:
-						self.screen.blit(tile.image, self.camera.apply(tile))	
+			self.draw_walking_mode()
 
-			# Draw the player
-			for sprite in self.allplayers:
-				self.screen.blit(sprite.image, self.camera.apply(sprite))
-
-			# Draw everything 'above' the player
-			for layer in self.tile_layers:
-				for tile in layer:
-					if tile.print_above_player and not tile.invisible:
-						self.screen.blit(tile.image, self.camera.apply(tile))	
-		
 		pygame.display.flip()
 
-		# for sprite in self.allsprites:
-		# 	self.screen.blit(sprite.image, self.camera.apply(sprite))
-
-			# Don't draw off-screen sprites
-			# if rect.right < 0 or rect.bottom < 0 or rect.left > Game.SCREENWIDTH or rect.top > Game.SCREENHEIGHT:
-			#		continue
-
-		
 
 	def play(self):
 		while True:
